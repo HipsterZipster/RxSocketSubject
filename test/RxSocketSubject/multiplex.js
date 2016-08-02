@@ -2,52 +2,53 @@ var Subject = Rx.Subject;
 var Observable = Rx.Observable;
 var multiplex = RxSocketSubject.multiplex;
 
-describe('multiplex', function(){
-	describe('the returned multiplexer function', function(){
-		it('should be a function', function(){
+describe('multiplex', function () {
+	describe('the returned multiplexer function', function () {
+		it('should be a function', function () {
 			var socket = new Subject();
 			var multiplexer = multiplex(socket, {
-				responseFilter: function() {
-					return function(x){ return x; }
+				responseFilter: function () {
+					return function (x) { return x; }
 				}
 			});
 			expect(typeof multiplexer).toBe('function');
 		});
 
-		it('should return an observable', function(){
+		it('should return an observable', function () {
 			var socket = new Subject();
 			var multiplexer = multiplex(socket, {
-				responseFilter: function() {
-					return function(x){ return x; }
+				responseFilter: function () {
+					return function (x) { return x; }
 				}
 			});
-			var result = multiplexer({ sub: 1 }, { unsub: 1 });
+			var result = multiplexer({sub: 1}, {unsub: 1});
 			expect(result instanceof Observable).toBe(true);
 		});
 
-		describe('the returned observable', function(){
-			it('should subscribe to the underlying socket and send a message on subscription and unsubscription', function(){
+		describe('the returned observable', function () {
+			it('should subscribe to the underlying socket and send a message on subscription and unsubscription', function () {
 				var socket = new Subject();
 				var socketDisposalSpy = jasmine.createSpy('socket.dispose');
 				spyOn(socket, 'onNext');
-				spyOn(socket, 'subscribe').and.callFake(function(){
-					return { 
-						dispose: function() {
-							expect(socket.onNext).toHaveBeenCalledWith(JSON.stringify({ unsub: 1 }));
+				spyOn(socket, 'subscribe').and.callFake(function () {
+					return {
+						dispose: function () {
+							expect(socket.onNext)
+								.toHaveBeenCalledWith(JSON.stringify({unsub: 1}));
 							socketDisposalSpy();
-						} 
+						}
 					};
 				});
 
 				var multiplexer = multiplex(socket, {
-					responseFilter: function() {
-						return function(x){ return x; }
+					responseFilter: function () {
+						return function (x) { return x; }
 					}
 				});
-				var result = multiplexer({ sub: 1 }, { unsub: 1 });
-				var disposable = result.subscribe(function(){});
+				var result = multiplexer({sub: 1}, {unsub: 1});
+				var disposable = result.subscribe(function () {});
 				expect(socket.subscribe).toHaveBeenCalled();
-				expect(socket.onNext).toHaveBeenCalledWith(JSON.stringify({ sub: 1 }));
+				expect(socket.onNext).toHaveBeenCalledWith(JSON.stringify({sub: 1}));
 				disposable.dispose();
 				expect(socketDisposalSpy).toHaveBeenCalled();
 			});
