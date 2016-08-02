@@ -32,71 +32,77 @@ define(
             var msgBuffer = [];
             var isOpen = false;
 
-            var socketOpen = function (e) {
+            var socketOpen = function(e) {
                 isOpen = true;
 
-                if (openObserver) {
+                if(openObserver) {
                     openObserver.onNext(e);
                 }
 
-                while (msgBuffer.length > 0) {
+                while(msgBuffer.length > 0) {
                     var msg = msgBuffer.shift();
                     toSocket.onNext(msg);
                 }
             };
 
-            var socketClosed = function () {
+            var socketClosed = function() {
                 isOpen = false;
             };
 
-            // subscribe to outward facing observer
-            // and buffer messages if necessary
-            observer.subscribe(function (msg) {
-                    if (isOpen) {
-                        toSocket.onNext(msg);
-                    } else {
-                        msgBuffer.push(msg);
-                    }
-                },
-                function (err) {
-                    if (toSocket) {
-                        toSocket.onError(err);
-                    }
-                },
-                function () {
-                    if (toSocket) {
-                        toSocket.onCompleted();
-                    }
-                });
+          // subscribe to outward facing observer
+          // and buffer messages if necessary
+          observer.subscribe(function(msg) {
+                if(isOpen) {
+                    toSocket.onNext(msg);
+                } else {
+                    msgBuffer.push(msg);
+                }
+            }, 
+            function(err) {
+                if(toSocket) {
+                    toSocket.onError(err);
+                }
+            }, 
+            function(){
+                if(toSocket) {
+                    toSocket.onCompleted();
+                }
+            });
 
             var i = 0;
             var innerObservable;
             var hasInnerObservable = false;
-            var getInnerObservable = function () {
-                if (!hasInnerObservable) {
+            var getInnerObservable = function(){
+                if(!hasInnerObservable) {
                     toSocket = new Subject();
-                    innerObservable = connections.map(function (conn) {
-                        return (typeof conn === 'string') ? {url: conn, protocol: null} : conn;
-                    }).flatMapLatest(function (conn) {
-                        return Observable.create(function (o) {
-                            var socket = fromWebSocket(conn.url, conn.protocol, Observer.create(function (e) {
+                    innerObservable = connections.map(function(conn) {
+                        return (typeof conn === 'string') ? { url: conn, protocol: null } : conn;
+                    }).flatMapLatest(function(conn) {
+                        return Observable.create(function(o) {
+
+                            var closingProxyObserver = closingObserver ? 
+                                Rx.Observer.create(function(e) {
+                                    closingObserver.onNext(e);
+                                }) :
+                                undefined;
+
+                            var socket = fromWebSocket(conn.url, conn.protocol, Observer.create(function(e) {
                                 socketOpen(e);
-                            }), closingObserver);
+                            }), closingProxyObserver);
 
                             return new Rx.CompositeDisposable(
-                                socket['catch'](function (err) {
-                                    if (errorObserver) {
-                                        errorObserver.onNext(err);
-                                    }
-                                    throw err;
-                                })['finally'](function () {
-                                    socketClosed();
-                                }).subscribe(o),
+                          socket['catch'](function(err) {
+                            if(errorObserver) {
+                                errorObserver.onNext(err);
+                            }
+                            throw err;
+                          })['finally'](function(){
+                            socketClosed();
+                          }).subscribe(o),
 
-                                toSocket.subscribe(socket)
-                            )
+                                toSocket.subscribe(socket))
                         });
-                    })['finally'](function () {
+                    })['finally'](function(){
                         hasInnerObservable = false;
                     }).publish().refCount();
 
@@ -106,7 +112,7 @@ define(
                 return innerObservable;
             };
 
-            var observable = Observable.create(function (o) {
+            var observable = Observable.create(function(o) {
                 var disposable = getInnerObservable().subscribe(o);
                 return disposable;
             });
@@ -116,28 +122,28 @@ define(
 
         RxSocketSubject.prototype = extend(Object.create(AnonymousSubject.prototype), {
             constructor: RxSocketSubject,
-            multiplex: function (responseFilter, options) {
+            multiplex: function(responseFilter, options) {
                 return multiplex(this, responseFilter, options);
             }
         });
 
         /**
-         Creates a new Socket Subject. The socket subject is an observable of socket message events, as well
-         as an observer of messages to send over the socket with `onNext()`, an a means to close the socket
-         with `onCompleted()` or `onError()`.
+            Creates a new Socket Subject. The socket subject is an observable of socket message events, as well
+            as an observer of messages to send over the socket with `onNext()`, an a means to close the socket
+            with `onCompleted()` or `onError()`.
 
-         @method create
-         @param connections {Rx.Observable} an observable of connection information, either endpoint URL strings,
-         or objects with `{ url: someUrl, protocol: someProtocol }`.
-         @param openObserver {Rx.Observer} [optional] an observer that will trigger
-         when the underlying socket opens. Will never error or complete.
-         @param errorObserver {Rx.Observer} [optional] an observer that emits errors occurring on the
-         socket. Will never error or complete.
-         @param closingObserver {Rx.Observer} [optional] an obsesrver that emits when the socket is about to close.
-         */
-        RxSocketSubject.create = function (connections, openObserver, errorObserver, closingObserver) {
+            @method create
+            @param connections {Rx.Observable} an observable of connection information, either endpoint URL strings,
+                or objects with `{ url: someUrl, protocol: someProtocol }`.
+            @param openObserver {Rx.Observer} [optional] an observer that will trigger
+                when the underlying socket opens. Will never error or complete.
+            @param errorObserver {Rx.Observer} [optional] an observer that emits errors occurring on the 
+                socket. Will never error or complete.
+            @param closingObserver {Rx.Observer} [optional] an obsesrver that emits when the socket is about to close.
+        */
+        RxSocketSubject.create = function(connections, openObserver, errorObserver, closingObserver) {
             var config;
-            if (connections instanceof Observable) {
+            if(connections instanceof Observable) {
                 console.warn('DEPRECATION: RxSocketSubject.create() should be called with a configuration object');
                 config = {
                     connections: connections,
